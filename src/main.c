@@ -307,7 +307,20 @@ void drawGame() {
         fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
         char* winner_text = (leftPaddle.score >= WINNING_SCORE) ? "Blue Wins!" : "Red Wins!";
         printText(winner_text, SCREEN_WIDTH/2 - 30, SCREEN_HEIGHT/2, RGBToWord(255, 255, 255), RGBToWord(0, 0, 0));
+         printText("Press button to restart", SCREEN_WIDTH/2 - 50, SCREEN_HEIGHT/2 + 10, RGBToWord(200, 200, 200), RGBToWord(0, 0, 0));
+        
     }
+}
+void restartGame() {
+    // Reset game state
+    initGame();
+
+    // Clear the screen and show the startup menu
+    fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+    showStartupScreen();
+
+    // Reset last draw time to ensure proper game loop timing
+    lastDrawTime = milliseconds;
 }
 
 int main() {
@@ -323,39 +336,49 @@ int main() {
     uint32_t last_ball_reset = 0;
     
     while (1) {
-        uint32_t currentTime = milliseconds;
-        
-        // Update game state at fixed intervals
-        if (currentTime - lastDrawTime >= FRAME_INTERVAL) {
-            // Game logic
-            if (gameMode == 0) {
-                if ((GPIOB->IDR & (1 << 5)) == 0 && rightPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT) 
-                    rightPaddle.y += PADDLE_SPEED;
-                if ((GPIOB->IDR & (1 << 4)) == 0 && rightPaddle.y > 0) 
-                    rightPaddle.y -= PADDLE_SPEED;
-            } else {
-                updateAI();
-            }
-
-            if ((GPIOA->IDR & (1 << 11)) == 0 && leftPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT) 
-                leftPaddle.y += PADDLE_SPEED;
-            if ((GPIOA->IDR & (1 << 8)) == 0 && leftPaddle.y > 0) 
-                leftPaddle.y -= PADDLE_SPEED;
-
-            if (!ball.active && (currentTime - last_ball_reset > 1000)) {
-                ball.active = 1;
-                last_ball_reset = currentTime;
-            }
-            
-            updateBall();
-            drawGame();
-            
-            lastDrawTime = currentTime;
+    uint32_t currentTime = milliseconds;
+    
+    // Update game state at fixed intervals
+    if (currentTime - lastDrawTime >= FRAME_INTERVAL) {
+        // Game logic
+        if (gameMode == 0) {
+            if ((GPIOB->IDR & (1 << 5)) == 0 && rightPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT) 
+                rightPaddle.y += PADDLE_SPEED;
+            if ((GPIOB->IDR & (1 << 4)) == 0 && rightPaddle.y > 0) 
+                rightPaddle.y -= PADDLE_SPEED;
         } else {
-            // Sleep while waiting for next frame
-            __asm(" wfi ");
+            updateAI();
+        }
+
+        if ((GPIOA->IDR & (1 << 11)) == 0 && leftPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT) 
+            leftPaddle.y += PADDLE_SPEED;
+        if ((GPIOA->IDR & (1 << 8)) == 0 && leftPaddle.y > 0) 
+            leftPaddle.y -= PADDLE_SPEED;
+
+        if (!ball.active && (currentTime - last_ball_reset > 1000)) {
+            ball.active = 1;
+            last_ball_reset = currentTime;
+        }
+        
+        updateBall();
+        drawGame();
+        
+        lastDrawTime = currentTime;
+    } else {
+        // Sleep while waiting for next frame
+        __asm(" wfi ");
+    }
+
+    // Check for game over and restart
+    if (leftPaddle.score >= WINNING_SCORE || rightPaddle.score >= WINNING_SCORE) {
+        if ((GPIOB->IDR & (1 << 4)) == 0) {
+            // Restart button pressed
+            restartGame();
+            showStartupScreen();
+            break;
         }
     }
+}
     return 0;
 }
 void initSysTick(void)
