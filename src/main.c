@@ -512,7 +512,7 @@ void setupIO()
     GPIOB->OTYPER &= ~(1U << 0);
     GPIOB->OTYPER &= ~(1U << 1);
     
-    // Set to high speed
+    // Set to high speeds
     GPIOB->OSPEEDR |= (3U << (0 * 2));
     GPIOB->OSPEEDR |= (3U << (1 * 2));
     
