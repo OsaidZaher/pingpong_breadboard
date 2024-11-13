@@ -16,6 +16,10 @@ void setupIO();
 int isInside(uint16_t x1, uint16_t y1, uint16_t w, uint16_t h, uint16_t px, uint16_t py);
 void enablePullUp(GPIO_TypeDef *Port, uint32_t BitNumber);
 void pinMode(GPIO_TypeDef *Port, uint32_t BitNumber, uint32_t Mode);
+void redOn(void);
+void redOff(void);
+void blueOn(void);
+void blueOff(void);
 
 volatile uint32_t milliseconds;
 volatile uint8_t gameMode = 0;
@@ -74,6 +78,28 @@ void initGame() {
     rightPaddle.x = SCREEN_WIDTH - 10 - PADDLE_WIDTH;
     rightPaddle.y = SCREEN_HEIGHT / 2 - PADDLE_HEIGHT / 2;
     rightPaddle.score = 0;
+}
+
+void redOn(void)
+{
+    // Should be PB1 instead of PB0 since that's where it's connected
+    GPIOB->ODR |= (1<<1);  // Changed from PB0 to PB1
+}
+
+void redOff(void)
+{
+    GPIOB->ODR &= ~(1<<1);  // Changed from PB0 to PB1
+}
+
+void blueOn(void)
+{
+    // Should be PB0 not PB1 since blue is on PB0
+    GPIOB->ODR |= (1<<0);  // Changed from PB1 to PB0
+}
+
+void blueOff(void)
+{
+    GPIOB->ODR &= ~(1<<0);  // Changed from PB1 to PB0
 }
 
 void showStartupScreen() {
@@ -224,8 +250,20 @@ void updateBall() {
 
     // Scoring and resetting the ball if it goes out of bounds
     if (ball.x <= 0 || ball.x >= SCREEN_WIDTH - BALL_SIZE) {
-        if (ball.x <= 0) rightPaddle.score++;
-        else leftPaddle.score++;
+        if (ball.x <= 0)
+        {
+            rightPaddle.score++;
+            blueOn();
+            delay(250);
+            blueOff();
+        }
+        else
+        {
+            leftPaddle.score++;
+            redOn();
+            delay(250);
+            redOff();
+        };
         
         ball.x = SCREEN_WIDTH / 2 - BALL_SIZE / 2;
         ball.y = SCREEN_HEIGHT / 2 - BALL_SIZE / 2;
@@ -327,12 +365,12 @@ int main() {
     initClock();
     initSysTick();
     setupIO();
-    
     // Clear screen once at startup
     fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     showStartupScreen();
     initGame();
-
+   // Set both pins high and keep them high
+    
     uint32_t last_ball_reset = 0;
     
     while (1) {
@@ -460,14 +498,32 @@ int isInside(uint16_t x1, uint16_t y1, uint16_t w, uint16_t h, uint16_t px, uint
 
 void setupIO()
 {
-	RCC->AHBENR |= (1 << 18) + (1 << 17); // enable Ports A and B
-	display_begin();
-	pinMode(GPIOB,4,0);
-	pinMode(GPIOB,5,0);
-	pinMode(GPIOA,8,0);
-	pinMode(GPIOA,11,0);
-	enablePullUp(GPIOB,4);
-	enablePullUp(GPIOB,5);
-	enablePullUp(GPIOA,11);
-	enablePullUp(GPIOA,8);
+    RCC->AHBENR |= (1 << 18) + (1 << 17); 
+    
+    // Reset pins to known state first
+    GPIOB->MODER &= ~(3U << (0 * 2));  // Clear PB0 bits
+    GPIOB->MODER &= ~(3U << (1 * 2));  // Clear PB1 bits
+    
+    // Configure pins as outputs explicitly
+    GPIOB->MODER |= (1U << (0 * 2));   // Set PB0 as output
+    GPIOB->MODER |= (1U << (1 * 2));   // Set PB1 as output
+    
+    // Ensure push-pull mode
+    GPIOB->OTYPER &= ~(1U << 0);
+    GPIOB->OTYPER &= ~(1U << 1);
+    
+    // Set to high speed
+    GPIOB->OSPEEDR |= (3U << (0 * 2));
+    GPIOB->OSPEEDR |= (3U << (1 * 2));
+    
+    // Rest of your setup
+    display_begin();
+    pinMode(GPIOB,4,0);
+    pinMode(GPIOB,5,0);
+    pinMode(GPIOA,8,0);
+    pinMode(GPIOA,11,0);
+    enablePullUp(GPIOB,4);
+    enablePullUp(GPIOB,5);
+    enablePullUp(GPIOA,11);
+    enablePullUp(GPIOA,8);
 }
