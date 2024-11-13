@@ -106,30 +106,47 @@ void showStartupScreen() {
     // Menu state variables
     int currentSelection = 0;  // 0: 2P, 1: 1P Easy, 2: 1P Medium, 3: 1P Hard
     int lastButtonState = 1;   // For button debouncing
-    const char* options[] = {"2P", "1P-E", "1P-M", "1P-H"};  // Shortened text
+    const char* options[] = {"2 Player", "1P-Easy", "1P-Medium", "1P-Hard"};
     const int numOptions = 4;
     bool needsRedraw = true;   // Only redraw when necessary
     
     // Initial screen draw
     fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     
+    // Calculate text positions for centering
+    const int titleY = 20;           // Welcome text position
+    const int subtitleY = 60;        // Choose game mode position
+    const int firstOptionY = 90;     // First option position
+    const int optionSpacing = 15;    // Space between options
+    
     while (1) {
         if (needsRedraw) {
-            // Draw static elements
-            printText("Mode", SCREEN_WIDTH/2 - 15, 10, RGBToWord(255, 255, 255), RGBToWord(0, 0, 0));
-            printText("^:chg >:sel", SCREEN_WIDTH/2 - 25, 20, RGBToWord(200, 200, 200), RGBToWord(0, 0, 0));
+            // Clear screen
+            fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+            
+            // Draw title - Welcome to Pong!
+            // Center calculation: screen width / 2 - (text length * approximate pixel width per char) / 2
+            printText("WELCOME", SCREEN_WIDTH/2 - 25, titleY, RGBToWord(255, 255, 255), RGBToWord(0, 0, 0));
+            printText("TO PONG!", SCREEN_WIDTH/2 - 25, titleY + 15, RGBToWord(255, 255, 255), RGBToWord(0, 0, 0));
+            
+            // Draw subtitle - Choose game mode
+            printText("Choose Game Mode", SCREEN_WIDTH/2 - 55, subtitleY, RGBToWord(200, 200, 200), RGBToWord(0, 0, 0));
 
+            
             // Display all options in a compact layout
             for (int i = 0; i < numOptions; i++) {
                 uint16_t color = (i == currentSelection) ? RGBToWord(0, 255, 0) : RGBToWord(255, 255, 255);
-                printText(options[i], SCREEN_WIDTH/2 - 15, 35 + (i * 10), color, RGBToWord(0, 0, 0));
+                // Center each option text
+                int textWidth = strlen(options[i]) * 6; // Approximate pixel width
+                int xPos = SCREEN_WIDTH/2 - textWidth/2;
+                printText(options[i], xPos, firstOptionY + (i * optionSpacing), color, RGBToWord(0, 0, 0));
             }
             
             needsRedraw = false;
         }
 
         // Check for button press (PA8) with debouncing
-        int currentButtonState = (GPIOA->IDR & (1 << 8)) == 0;
+        int currentButtonState = (GPIOA->IDR & (1 << 11)) == 0;
         if (currentButtonState && !lastButtonState) {
             currentSelection = (currentSelection + 1) % numOptions;
             needsRedraw = true;
@@ -143,22 +160,22 @@ void showStartupScreen() {
             if (currentSelection == 0) {
                 gameMode = 0;  // 2P mode
                 fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
-                printText("2P", SCREEN_WIDTH/2 - 10, SCREEN_HEIGHT/2, RGBToWord(0, 255, 0), RGBToWord(0, 0, 0));
+                printText("2 Player Mode", SCREEN_WIDTH/2 - 40, SCREEN_HEIGHT/2, RGBToWord(0, 255, 0), RGBToWord(0, 0, 0));
             } else {
                 gameMode = 1;  // 1P mode
                 fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
                 switch (currentSelection) {
                     case 1:
                         aiDifficulty = AI_DIFFICULTY_EASY;
-                        printText("1P-Easy", SCREEN_WIDTH/2 - 20, SCREEN_HEIGHT/2, RGBToWord(0, 255, 0), RGBToWord(0, 0, 0));
+                        printText("1 Player - Easy", SCREEN_WIDTH/2 - 55, SCREEN_HEIGHT/2, RGBToWord(0, 255, 0), RGBToWord(0, 0, 0));
                         break;
                     case 2:
                         aiDifficulty = AI_DIFFICULTY_MEDIUM;
-                        printText("1P-Med", SCREEN_WIDTH/2 - 20, SCREEN_HEIGHT/2, RGBToWord(0, 255, 0), RGBToWord(0, 0, 0));
+                        printText("1 Player - Medium", SCREEN_WIDTH/2 - 60, SCREEN_HEIGHT/2, RGBToWord(0, 255, 0), RGBToWord(0, 0, 0));
                         break;
                     case 3:
                         aiDifficulty = AI_DIFFICULTY_HARD;
-                        printText("1P-Hard", SCREEN_WIDTH/2 - 20, SCREEN_HEIGHT/2, RGBToWord(0, 255, 0), RGBToWord(0, 0, 0));
+                        printText("1 Player - Hard", SCREEN_WIDTH/2 - 55, SCREEN_HEIGHT/2, RGBToWord(0, 255, 0), RGBToWord(0, 0, 0));
                         break;
                 }
             }
@@ -311,43 +328,34 @@ void drawGame() {
         lastScoreUpdate = milliseconds;
     }
 
-    if (leftPaddle.score < WINNING_SCORE && rightPaddle.score < WINNING_SCORE) {
-        // Draw center line (only for game area, below score area)
-        for (int y = 20; y < SCREEN_HEIGHT; y += 8) {  // Start from y=20 to skip score area
-            fillRectangle(SCREEN_WIDTH/2 - 1, y, 2, 4, RGBToWord(128, 128, 128));
-        }
-
-        // Clear previous ball position if it has moved
-        if (lastBallX != -1 && (lastBallX != ball.x || lastBallY != ball.y)) {
-            fillRectangle(lastBallX, lastBallY, BALL_SIZE, BALL_SIZE, 0);
-        }
-        
-        // Clear previous paddle positions if they have moved
-        if (lastLeftPaddleY != -1 && lastLeftPaddleY != leftPaddle.y) {
-            fillRectangle(leftPaddle.x, lastLeftPaddleY, PADDLE_WIDTH, PADDLE_HEIGHT, 0);
-        }
-        if (lastRightPaddleY != -1 && lastRightPaddleY != rightPaddle.y) {
-            fillRectangle(rightPaddle.x, lastRightPaddleY, PADDLE_WIDTH, PADDLE_HEIGHT, 0);
-        }
-
-        // Draw new positions
-        putImage(leftPaddle.x, leftPaddle.y, PADDLE_WIDTH, PADDLE_HEIGHT, bat1, 0, 0);
-        putImage(rightPaddle.x, rightPaddle.y, PADDLE_WIDTH, PADDLE_HEIGHT, bat2, 0, 0);
-        putImage(ball.x, ball.y, BALL_SIZE, BALL_SIZE, pingpong_ball, 0, 0);
-        
-        // Store current positions
-        lastBallX = ball.x;
-        lastBallY = ball.y;
-        lastLeftPaddleY = leftPaddle.y;
-        lastRightPaddleY = rightPaddle.y;
-    } else {
-        // Game over screen
-        fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
-        char* winner_text = (leftPaddle.score >= WINNING_SCORE) ? "Blue Wins!" : "Red Wins!";
-        printText(winner_text, SCREEN_WIDTH/2 - 30, SCREEN_HEIGHT/2, RGBToWord(255, 255, 255), RGBToWord(0, 0, 0));
-         printText("Press button to restart", SCREEN_WIDTH/2 - 50, SCREEN_HEIGHT/2 + 10, RGBToWord(200, 200, 200), RGBToWord(0, 0, 0));
-        
+    // Draw center line (only for game area, below score area)
+    for (int y = 20; y < SCREEN_HEIGHT; y += 8) {  // Start from y=20 to skip score area
+        fillRectangle(SCREEN_WIDTH/2 - 1, y, 2, 4, RGBToWord(128, 128, 128));
     }
+
+    // Clear previous ball position if it has moved
+    if (lastBallX != -1 && (lastBallX != ball.x || lastBallY != ball.y)) {
+        fillRectangle(lastBallX, lastBallY, BALL_SIZE, BALL_SIZE, 0);
+    }
+    
+    // Clear previous paddle positions if they have moved
+    if (lastLeftPaddleY != -1 && lastLeftPaddleY != leftPaddle.y) {
+        fillRectangle(leftPaddle.x, lastLeftPaddleY, PADDLE_WIDTH, PADDLE_HEIGHT, 0);
+    }
+    if (lastRightPaddleY != -1 && lastRightPaddleY != rightPaddle.y) {
+        fillRectangle(rightPaddle.x, lastRightPaddleY, PADDLE_WIDTH, PADDLE_HEIGHT, 0);
+    }
+
+    // Draw new positions
+    putImage(leftPaddle.x, leftPaddle.y, PADDLE_WIDTH, PADDLE_HEIGHT, bat1, 0, 0);
+    putImage(rightPaddle.x, rightPaddle.y, PADDLE_WIDTH, PADDLE_HEIGHT, bat2, 0, 0);
+    putImage(ball.x, ball.y, BALL_SIZE, BALL_SIZE, pingpong_ball, 0, 0);
+    
+    // Store current positions
+    lastBallX = ball.x;
+    lastBallY = ball.y;
+    lastLeftPaddleY = leftPaddle.y;
+    lastRightPaddleY = rightPaddle.y;
 }
 void restartGame() {
     // Reset game state
@@ -365,60 +373,97 @@ int main() {
     initClock();
     initSysTick();
     setupIO();
+    
     // Clear screen once at startup
     fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     showStartupScreen();
     initGame();
-   // Set both pins high and keep them high
     
     uint32_t last_ball_reset = 0;
+    bool gameOver = false;
     
     while (1) {
-    uint32_t currentTime = milliseconds;
-    
-    // Update game state at fixed intervals
-    if (currentTime - lastDrawTime >= FRAME_INTERVAL) {
-        // Game logic
-        if (gameMode == 0) {
-            if ((GPIOB->IDR & (1 << 5)) == 0 && rightPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT) 
-                rightPaddle.y += PADDLE_SPEED;
-            if ((GPIOB->IDR & (1 << 4)) == 0 && rightPaddle.y > 0) 
-                rightPaddle.y -= PADDLE_SPEED;
-        } else {
-            updateAI();
-        }
-
-        if ((GPIOA->IDR & (1 << 11)) == 0 && leftPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT) 
-            leftPaddle.y += PADDLE_SPEED;
-        if ((GPIOA->IDR & (1 << 8)) == 0 && leftPaddle.y > 0) 
-            leftPaddle.y -= PADDLE_SPEED;
-
-        if (!ball.active && (currentTime - last_ball_reset > 1000)) {
-            ball.active = 1;
-            last_ball_reset = currentTime;
+        uint32_t currentTime = milliseconds;
+        
+        // Game over state handling
+        if (leftPaddle.score >= WINNING_SCORE || rightPaddle.score >= WINNING_SCORE) {
+            if (!gameOver) {
+                // First time entering game over state
+                gameOver = true;
+                fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+        
+        // Winner text positioning
+                char* winner_text = (leftPaddle.score >= WINNING_SCORE) ? "Blue Wins!" : "Red Wins!";
+                // Center winner text (assuming ~6 pixels per character)
+                int winner_text_width = strlen(winner_text) * 6;
+                int winner_x = (SCREEN_WIDTH - winner_text_width) / 2;
+                printText(winner_text, winner_x, SCREEN_HEIGHT/2 - 20, RGBToWord(255, 255, 255), RGBToWord(0, 0, 0));
+                
+                // Restart instructions
+                // Center "Press button" text
+                const char* press_text = "Press -> button";
+                int press_text_width = strlen(press_text) * 6;
+                int press_x = (SCREEN_WIDTH - press_text_width) / 2;
+                printText(press_text, press_x, SCREEN_HEIGHT/2 + 10, RGBToWord(200, 200, 200), RGBToWord(0, 0, 0));
+                
+                // Center "to restart" text
+                const char* restart_text = "to restart";
+                int restart_text_width = strlen(restart_text) * 6;
+                int restart_x = (SCREEN_WIDTH - restart_text_width) / 2;
+                printText(restart_text, restart_x, SCREEN_HEIGHT/2 + 25, RGBToWord(200, 200, 200), RGBToWord(0, 0, 0));
+    }
+            
+            // Check for restart button with debouncing
+            if ((GPIOB->IDR & (1 << 4)) == 0) {
+                delay(200);  // Debounce delay
+                gameOver = false;
+                fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+                showStartupScreen();
+                initGame();
+                lastDrawTime = milliseconds;
+                last_ball_reset = milliseconds;
+                continue;
+            }
         }
         
-        updateBall();
-        drawGame();
-        
-        lastDrawTime = currentTime;
+        // Normal game update at fixed intervals
+        if (!gameOver && currentTime - lastDrawTime >= FRAME_INTERVAL) {
+    // Game logic
+    if (gameMode == 0) {  // Two-player mode
+        // Right paddle controls - Up button now moves down
+        if ((GPIOA->IDR & (1 << 8)) == 0 && rightPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT)  // Top button (PA8) for down
+            rightPaddle.y += PADDLE_SPEED;
+        if ((GPIOB->IDR & (1 << 5)) == 0 && rightPaddle.y > 0)  // Right button (PB5) for up
+            rightPaddle.y -= PADDLE_SPEED;
     } else {
-        // Sleep while waiting for next frame
-        __asm(" wfi ");
+        updateAI();  // AI controls right paddle in single-player mode
     }
 
-    // Check for game over and restart
-    if (leftPaddle.score >= WINNING_SCORE || rightPaddle.score >= WINNING_SCORE) {
-        if ((GPIOB->IDR & (1 << 4)) == 0) {
-            // Restart button pressed
-            restartGame();
-            showStartupScreen();
-            break;
-        }
+    // Left paddle controls - Up button now moves down
+    if ((GPIOB->IDR & (1 << 4)) == 0 && leftPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT)  // Left button (PB4) for down
+        leftPaddle.y += PADDLE_SPEED;
+    if ((GPIOA->IDR & (1 << 11)) == 0 && leftPaddle.y > 0)  // Bottom button (PA11) for up
+        leftPaddle.y -= PADDLE_SPEED;
+
+    if (!ball.active && (currentTime - last_ball_reset > 1000)) {
+        ball.active = 1;
+        last_ball_reset = currentTime;
     }
+    
+    updateBall();
+    drawGame();
+    
+    lastDrawTime = currentTime;
+} else {
+    // Sleep while waiting for next frame
+    __asm(" wfi ");
 }
+    }
     return 0;
 }
+
+
+
 void initSysTick(void)
 {
 	SysTick->LOAD = 48000;
