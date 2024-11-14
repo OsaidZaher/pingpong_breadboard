@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "serial.h"
+
 #define WINNING_SCORE 7 
 
 #define FRAME_INTERVAL 16  // ~60fps
@@ -20,6 +22,16 @@ void redOn(void);
 void redOff(void);
 void blueOn(void);
 void blueOff(void);
+
+
+
+int _write(int file, char *ptr, int len) {
+    int i;
+    for(i = 0; i < len; i++) {
+        eputchar(*ptr++);
+    }
+    return len;
+}
 
 volatile uint32_t milliseconds;
 volatile uint8_t gameMode = 0;
@@ -43,6 +55,8 @@ const  uint16_t pingpong_ball[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 
 volatile uint8_t aiDifficulty = AI_DIFFICULTY_MEDIUM;  // Default to medium
+// Ensure the _write function waits for transmission completion
+
 
 // Game objects
 typedef struct {
@@ -242,7 +256,6 @@ void updateAI() {
     }
 }
 
-// Update ball position and handle collisions
 void updateBall() {
     if (!ball.active) return;
 
@@ -270,6 +283,7 @@ void updateBall() {
         if (ball.x <= 0)
         {
             rightPaddle.score++;
+            printf("Red scores! Score is now - Blue: %d, Red: %d\n", leftPaddle.score, rightPaddle.score);
             blueOn();
             delay(250);
             blueOff();
@@ -277,10 +291,11 @@ void updateBall() {
         else
         {
             leftPaddle.score++;
+            printf("Blue scores! Score is now - Blue: %d, Red: %d\n", leftPaddle.score, rightPaddle.score);
             redOn();
             delay(250);
             redOff();
-        };
+        }
         
         ball.x = SCREEN_WIDTH / 2 - BALL_SIZE / 2;
         ball.y = SCREEN_HEIGHT / 2 - BALL_SIZE / 2;
@@ -288,9 +303,16 @@ void updateBall() {
         ball.active = 0;
     }
 
-    // Check for a winner
+    // Check for a winner and print final score
     if (leftPaddle.score >= WINNING_SCORE || rightPaddle.score >= WINNING_SCORE) {
         ball.active = 0;
+        printf("\n*** GAME OVER ***\n");
+        if (leftPaddle.score >= WINNING_SCORE) {
+            printf("Blue wins with a score of %d-%d!\n", leftPaddle.score, rightPaddle.score);
+        } else {
+            printf("Red wins with a score of %d-%d!\n", rightPaddle.score, leftPaddle.score);
+        }
+        printf("***************\n\n");
     }
 }
 
@@ -373,7 +395,8 @@ int main() {
     initClock();
     initSysTick();
     setupIO();
-    
+    initSerial();
+
     // Clear screen once at startup
     fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     showStartupScreen();
@@ -425,21 +448,19 @@ int main() {
                 continue;
             }
         }
-        
-        // Normal game update at fixed intervals
         if (!gameOver && currentTime - lastDrawTime >= FRAME_INTERVAL) {
     // Game logic
     if (gameMode == 0) {  // Two-player mode
-        // Right paddle controls - Up button now moves down
-        if ((GPIOA->IDR & (1 << 8)) == 0 && rightPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT)  // Top button (PA8) for down
-            rightPaddle.y += PADDLE_SPEED;
-        if ((GPIOB->IDR & (1 << 5)) == 0 && rightPaddle.y > 0)  // Right button (PB5) for up
+        // Right paddle controls - Fixed to be intuitive
+        if ((GPIOA->IDR & (1 << 8)) == 0 && rightPaddle.y > 0)  // Top button (PA8) for up
             rightPaddle.y -= PADDLE_SPEED;
+        if ((GPIOB->IDR & (1 << 5)) == 0 && rightPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT)  // Right button (PB5) for down
+            rightPaddle.y += PADDLE_SPEED;
     } else {
         updateAI();  // AI controls right paddle in single-player mode
     }
 
-    // Left paddle controls - Up button now moves down
+    // Left paddle controls - Fixed to be intuitive
     if ((GPIOB->IDR & (1 << 4)) == 0 && leftPaddle.y < SCREEN_HEIGHT - PADDLE_HEIGHT)  // Left button (PB4) for down
         leftPaddle.y += PADDLE_SPEED;
     if ((GPIOA->IDR & (1 << 11)) == 0 && leftPaddle.y > 0)  // Bottom button (PA11) for up
@@ -458,6 +479,7 @@ int main() {
     // Sleep while waiting for next frame
     __asm(" wfi ");
 }
+       
     }
     return 0;
 }
@@ -572,3 +594,5 @@ void setupIO()
     enablePullUp(GPIOA,11);
     enablePullUp(GPIOA,8);
 }
+
+
