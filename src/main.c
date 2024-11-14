@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "serial.h"
-
+#include <string.h>
 #define WINNING_SCORE 7 
 
 #define FRAME_INTERVAL 16  // ~60fps
@@ -22,6 +22,10 @@ void redOn(void);
 void redOff(void);
 void blueOn(void);
 void blueOff(void);
+void initAudio(void);    
+void playSound(uint32_t frequency, uint32_t duration);
+void playBlueVictorySound(void);
+void playRedVictorySound(void);
 
 
 
@@ -272,10 +276,12 @@ void updateBall() {
     if (isInside(leftPaddle.x, leftPaddle.y, PADDLE_WIDTH, PADDLE_HEIGHT, ball.x, ball.y)) {
         ball.dx = BALL_SPEED_X;
         ball.dy = ((ball.y + BALL_SIZE/2) - (leftPaddle.y + PADDLE_HEIGHT/2)) / 4;
+        playSound(1000, 5);
     }
     if (isInside(rightPaddle.x, rightPaddle.y, PADDLE_WIDTH, PADDLE_HEIGHT, ball.x + BALL_SIZE, ball.y)) {
         ball.dx = -BALL_SPEED_X;
         ball.dy = ((ball.y + BALL_SIZE/2) - (rightPaddle.y + PADDLE_HEIGHT/2)) / 4;
+        playSound(1000, 5);
     }
 
     // Scoring and resetting the ball if it goes out of bounds
@@ -284,6 +290,9 @@ void updateBall() {
         {
             rightPaddle.score++;
             printf("Red scores! Score is now - Blue: %d, Red: %d\n", leftPaddle.score, rightPaddle.score);
+            playSound(988, 50);  // B5
+            delay(30);
+            playSound(1319, 100); // E6
             blueOn();
             delay(250);
             blueOff();
@@ -292,6 +301,9 @@ void updateBall() {
         {
             leftPaddle.score++;
             printf("Blue scores! Score is now - Blue: %d, Red: %d\n", leftPaddle.score, rightPaddle.score);
+            playSound(1319, 50);  // E6
+            delay(30);
+            playSound(988, 100);
             redOn();
             delay(250);
             redOff();
@@ -396,7 +408,7 @@ int main() {
     initSysTick();
     setupIO();
     initSerial();
-
+    initAudio();
     // Clear screen once at startup
     fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     showStartupScreen();
@@ -414,6 +426,11 @@ int main() {
                 // First time entering game over state
                 gameOver = true;
                 fillRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+            if (leftPaddle.score >= WINNING_SCORE) {
+                playRedVictorySound();
+            } else {
+                playBlueVictorySound();
+            }
         
         // Winner text positioning
                 char* winner_text = (leftPaddle.score >= WINNING_SCORE) ? "Blue Wins!" : "Red Wins!";
@@ -499,16 +516,11 @@ void SysTick_Handler(void)
 }
 void initClock(void)
 {
-// This is potentially a dangerous function as it could
-// result in a system with an invalid clock signal - result: a stuck system
         // Set the PLL up
         // First ensure PLL is disabled
         RCC->CR &= ~(1u<<24);
         while( (RCC->CR & (1 <<25))); // wait for PLL ready to be cleared
-        
-// Warning here: if system clock is greater than 24MHz then wait-state(s) need to be
-// inserted into Flash memory interface
-				
+        		
         FLASH->ACR |= (1 << 0);
         FLASH->ACR &=~((1u << 2) | (1u<<1));
         // Turn on FLASH prefetch buffer
@@ -567,23 +579,18 @@ void setupIO()
 {
     RCC->AHBENR |= (1 << 18) + (1 << 17); 
     
-    // Reset pins to known state first
     GPIOB->MODER &= ~(3U << (0 * 2));  // Clear PB0 bits
     GPIOB->MODER &= ~(3U << (1 * 2));  // Clear PB1 bits
     
-    // Configure pins as outputs explicitly
     GPIOB->MODER |= (1U << (0 * 2));   // Set PB0 as output
     GPIOB->MODER |= (1U << (1 * 2));   // Set PB1 as output
     
-    // Ensure push-pull mode
     GPIOB->OTYPER &= ~(1U << 0);
     GPIOB->OTYPER &= ~(1U << 1);
     
-    // Set to high speedss
     GPIOB->OSPEEDR |= (3U << (0 * 2));
     GPIOB->OSPEEDR |= (3U << (1 * 2));
     
-    // Rest of your setup
     display_begin();
     pinMode(GPIOB,4,0);
     pinMode(GPIOB,5,0);
@@ -595,4 +602,90 @@ void setupIO()
     enablePullUp(GPIOA,8);
 }
 
+//SOUND FUNCTION
+void initAudio(void) {
+    // Enable GPIOB and TIM2
+    RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
+    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 
+    // Configure PB3 for alternate function TIM2_CH2
+    GPIOB->MODER &= ~(3u << (3 * 2));
+    GPIOB->MODER |= (2u << (3 * 2));
+    GPIOB->AFR[0] &= ~(0xF << (3 * 4));
+    GPIOB->AFR[0] |= (2u << (3 * 4));
+
+    // Disable timer first
+    TIM2->CR1 = 0;
+    
+    // Configure timer in PWM mode
+    TIM2->PSC = 0;
+    TIM2->ARR = 48000;
+    TIM2->CCR2 = 0;  // Start silent
+    
+    // PWM configuration
+    TIM2->CCMR1 &= ~(TIM_CCMR1_OC2M);  // Clear output compare mode bits
+    TIM2->CCMR1 |= (TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2);  // Set PWM mode 1
+    TIM2->CCMR1 |= TIM_CCMR1_OC2PE;    // Enable preload
+    TIM2->CR1 |= TIM_CR1_ARPE;         // Enable auto-reload preload
+    
+    // Enable output
+    TIM2->CCER |= TIM_CCER_CC2E;
+    
+    // Start timer
+    TIM2->CR1 |= TIM_CR1_CEN;
+}
+
+void playSound(uint32_t frequency, uint32_t duration) {
+    TIM2->ARR = 48000000 / frequency;
+    TIM2->CCR2 = TIM2->ARR / 8;
+    delay(duration);
+    TIM2->CCR2 = 0;
+}
+
+void playBlueVictorySound(void) {
+    // Blue Victory Theme
+    playSound(400, 100);
+    delay(50);
+    playSound(500, 100);
+    delay(50);
+    playSound(600, 100);
+    delay(50);
+    playSound(800, 150);
+    delay(100);
+    playSound(600, 100);
+    delay(50);
+    playSound(800, 100);
+    delay(50);
+    playSound(1000, 200);
+    blueOn();
+    delay(100);
+    blueOff();
+    delay(100);
+    blueOn();
+    delay(100);
+    blueOff();
+}
+
+void playRedVictorySound(void) {
+    // Red Victory Theme
+    playSound(1000, 100);
+    delay(50);
+    playSound(800, 100);
+    delay(50);
+    playSound(1000, 100);
+    delay(50);
+    playSound(600, 150);
+    delay(100);
+    playSound(800, 100);
+    delay(50);
+    playSound(600, 100);
+    delay(50);
+    playSound(400, 200);
+    redOn();
+    delay(100);
+    redOff();
+    delay(100);
+    redOn();
+    delay(100);
+    redOff();
+}
