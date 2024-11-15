@@ -516,25 +516,18 @@ void SysTick_Handler(void)
 }
 void initClock(void)
 {
-        // Set the PLL up
-        // First ensure PLL is disabled
+      
         RCC->CR &= ~(1u<<24);
-        while( (RCC->CR & (1 <<25))); // wait for PLL ready to be cleared
-        		
+        while( (RCC->CR & (1 <<25))); 
         FLASH->ACR |= (1 << 0);
         FLASH->ACR &=~((1u << 2) | (1u<<1));
-        // Turn on FLASH prefetch buffer
         FLASH->ACR |= (1 << 4);
-        // set PLL multiplier to 12 (yielding 48MHz)
         RCC->CFGR &= ~((1u<<21) | (1u<<20) | (1u<<19) | (1u<<18));
         RCC->CFGR |= ((1<<21) | (1<<19) ); 
 
-        // Need to limit ADC clock to below 14MHz so will change ADC prescaler to 4
         RCC->CFGR |= (1<<14);
 
-        // and turn the PLL back on again
         RCC->CR |= (1<<24);        
-        // set PLL as system clock source 
         RCC->CFGR |= (1<<1);
 }
 void delay(volatile uint32_t dly)
@@ -546,8 +539,8 @@ void delay(volatile uint32_t dly)
 
 void enablePullUp(GPIO_TypeDef *Port, uint32_t BitNumber)
 {
-	Port->PUPDR = Port->PUPDR &~(3u << BitNumber*2); // clear pull-up resistor bits
-	Port->PUPDR = Port->PUPDR | (1u << BitNumber*2); // set pull-up bit
+	Port->PUPDR = Port->PUPDR &~(3u << BitNumber*2); 
+	Port->PUPDR = Port->PUPDR | (1u << BitNumber*2); 
 }
 void pinMode(GPIO_TypeDef *Port, uint32_t BitNumber, uint32_t Mode)
 {
@@ -561,14 +554,12 @@ void pinMode(GPIO_TypeDef *Port, uint32_t BitNumber, uint32_t Mode)
 }
 int isInside(uint16_t x1, uint16_t y1, uint16_t w, uint16_t h, uint16_t px, uint16_t py)
 {
-	// checks to see if point px,py is within the rectange defined by x,y,w,h
 	uint16_t x2,y2;
 	x2 = x1+w;
 	y2 = y1+h;
 	int rvalue = 0;
 	if ( (px >= x1) && (px <= x2))
 	{
-		// ok, x constraint met
 		if ( (py >= y1) && (py <= y2))
 			rvalue = 1;
 	}
@@ -579,11 +570,11 @@ void setupIO()
 {
     RCC->AHBENR |= (1 << 18) + (1 << 17); 
     
-    GPIOB->MODER &= ~(3U << (0 * 2));  // Clear PB0 bits
-    GPIOB->MODER &= ~(3U << (1 * 2));  // Clear PB1 bits
+    GPIOB->MODER &= ~(3U << (0 * 2));  
+    GPIOB->MODER &= ~(3U << (1 * 2));  
     
-    GPIOB->MODER |= (1U << (0 * 2));   // Set PB0 as output
-    GPIOB->MODER |= (1U << (1 * 2));   // Set PB1 as output
+    GPIOB->MODER |= (1U << (0 * 2));   
+    GPIOB->MODER |= (1U << (1 * 2));   
     
     GPIOB->OTYPER &= ~(1U << 0);
     GPIOB->OTYPER &= ~(1U << 1);
@@ -602,36 +593,30 @@ void setupIO()
     enablePullUp(GPIOA,8);
 }
 
-//SOUND FUNCTION
 void initAudio(void) {
-    // Enable GPIOB and TIM2
     RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
     RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 
-    // Configure PB3 for alternate function TIM2_CH2
     GPIOB->MODER &= ~(3u << (3 * 2));
     GPIOB->MODER |= (2u << (3 * 2));
     GPIOB->AFR[0] &= ~(0xF << (3 * 4));
     GPIOB->AFR[0] |= (2u << (3 * 4));
 
-    // Disable timer first
     TIM2->CR1 = 0;
     
-    // Configure timer in PWM mode
     TIM2->PSC = 0;
     TIM2->ARR = 48000;
-    TIM2->CCR2 = 0;  // Start silent
+    TIM2->CCR2 = 0;  
     
-    // PWM configuration
-    TIM2->CCMR1 &= ~(TIM_CCMR1_OC2M);  // Clear output compare mode bits
-    TIM2->CCMR1 |= (TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2);  // Set PWM mode 1
-    TIM2->CCMR1 |= TIM_CCMR1_OC2PE;    // Enable preload
-    TIM2->CR1 |= TIM_CR1_ARPE;         // Enable auto-reload preload
+    TIM2->CCMR1 &= ~(TIM_CCMR1_OC2M); 
+    TIM2->CCMR1 |= (TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2);  
+    TIM2->CCMR1 |= TIM_CCMR1_OC2PE;    
+    TIM2->CR1 |= TIM_CR1_ARPE;         
     
-    // Enable output
+    
     TIM2->CCER |= TIM_CCER_CC2E;
     
-    // Start timer
+    
     TIM2->CR1 |= TIM_CR1_CEN;
 }
 
@@ -662,7 +647,7 @@ void playBlueVictorySound(void) {
     blueOff();
     delay(100);
     blueOn();
-    delay(100);
+    delay(100);erfe
     blueOff();
 }
 
