@@ -647,7 +647,7 @@ void playBlueVictorySound(void) {
     blueOff();
     delay(100);
     blueOn();
-    delay(100);erfe
+    delay(100);
     blueOff();
 }
 
